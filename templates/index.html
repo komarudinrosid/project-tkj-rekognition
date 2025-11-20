@@ -1,0 +1,86 @@
+<!-- /Users/arrosid/Dev/project-tkj-rekognition/templates/index.html -->
+<!doctype html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Capture & Rekognition</title>
+<style>
+body { font-family: system-ui, sans-serif; margin: 16px; }
+video, img { width: 100%; max-width: 480px; border-radius: 8px; background: #000; }
+button { padding: 10px 14px; margin-right: 8px; margin-top: 8px; }
+pre { background: #f5f5f7; padding: 12px; overflow: auto; border-radius: 8px; }
+</style>
+</head>
+<body>
+<h2>Ambil Foto, Upload ke S3, Cocokkan Rekognition</h2>
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas" hidden></canvas>
+<div>
+<button id="startCamera">Aktifkan Kamera</button>
+<button id="snap" disabled>Ambil Foto</button>
+<button id="upload" disabled>Upload & Cocokkan</button>
+</div>
+<p>Alternatif pilih file:</p>
+<input id="fileInput" type="file" accept="image/*" capture="environment">
+<img id="preview" alt="Preview">
+<h3>Status</h3>
+<div id="status"></div>
+<h3>Analisa</h3>
+<pre id="analysis"></pre>
+<h3>Hasil (debug)</h3>
+<pre id="result"></pre>
+<script>
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const startBtn = document.getElementById('startCamera');
+const snapBtn = document.getElementById('snap');
+const uploadBtn = document.getElementById('upload');
+const fileInput = document.getElementById('fileInput');
+const preview = document.getElementById('preview');
+const result = document.getElementById('result');
+const status = document.getElementById('status');
+const analysisEl = document.getElementById('analysis');
+let lastBlob = null;
+
+startBtn.onclick = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = stream;
+    snapBtn.disabled = false;
+  } catch (e) {
+    snapBtn.disabled = true;
+  }
+};
+
+snapBtn.onclick = () => {
+  const w = video.videoWidth, h = video.videoHeight;
+  if (!w || !h) return;
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, w, h);
+  canvas.toBlob(b => { lastBlob = b; preview.src = URL.createObjectURL(b); uploadBtn.disabled = false; }, 'image/jpeg', 0.9);
+};
+
+fileInput.onchange = () => {
+  const f = fileInput.files[0];
+  if (f) { lastBlob = f; preview.src = URL.createObjectURL(f); uploadBtn.disabled = false; }
+};
+
+uploadBtn.onclick = async () => {
+  if (!lastBlob) return;
+  const fd = new FormData();
+  fd.append('photo', lastBlob, 'capture.jpg');
+  const res = await fetch('/upload', { method: 'POST', body: fd });
+  const json = await res.json();
+  result.textContent = JSON.stringify(json, null, 2);
+  if (json.recognized) {
+    status.textContent = `Dikenali: ${json.name || '(tanpa nama)'} (similarity ${json.similarity ? json.similarity.toFixed(1) : 'n/a'}%)`;
+    analysisEl.textContent = '';
+  } else {
+    status.textContent = json.message || 'kamu tidak dikenali';
+    analysisEl.textContent = JSON.stringify(json.analysis || {}, null, 2);
+  }
+};
+</script>
+</body>
+</html>
