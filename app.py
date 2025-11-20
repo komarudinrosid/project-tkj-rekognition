@@ -25,8 +25,17 @@ app = Flask(__name__)
 region = os.environ.get('AWS_REGION')
 bucket = os.environ.get('S3_BUCKET_NAME')
 collection_id = os.environ.get('REKOGNITION_COLLECTION_ID')
-s3 = boto3.client('s3', region_name=region) if region else boto3.client('s3')
-rek = boto3.client('rekognition', region_name=region) if region else boto3.client('rekognition')
+aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID')
+aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
+aws_session_token = os.environ.get('AWS_SESSION_TOKEN')
+session = boto3.Session(
+    aws_access_key_id=aws_access_key_id,
+    aws_secret_access_key=aws_secret_access_key,
+    aws_session_token=aws_session_token,
+    region_name=region
+)
+s3 = session.client('s3')
+rek = session.client('rekognition')
 
 @app.route('/')
 def index():
